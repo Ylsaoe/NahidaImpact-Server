@@ -8,7 +8,7 @@ public class PacketPingRsp : BasePacket
     {
         var proto = new PingRsp()
         {
-            ClientTime = (uint)DateTimeOffset.Now.ToUnixTimeSeconds()
+            ServerTime = (uint)DateTimeOffset.Now.ToUnixTimeSeconds()
         };
         
         SetData(proto);

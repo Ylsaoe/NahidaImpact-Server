@@ -15,8 +15,6 @@ public class PacketPlayerLoginRsp : BasePacket
     
     public PacketPlayerLoginRsp(Connection connection) : base(CmdIds.PlayerLoginRsp)
     {
-        connection.UseDispatchKey = true;
-        
         RegionInfo info;
         
         if (RegionCache == null)

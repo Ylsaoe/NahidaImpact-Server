@@ -42,7 +42,7 @@ public class HandlerGetPlayerTokenReq : Handler
         await connection.Player.OnGetToken();
         connection.Player.Connection = connection;
 
-        // await connection.SendPacket(new PacketGetPlayerTokenRsp(connection, req.AccountToken, req.KeyId)); // TODO 加上判断
+        await connection.SendPacket(new PacketGetPlayerTokenRsp(connection, req.AccountToken, req.KeyId)); // TODO 加上判断
         
         connection.SecretKey = Crypto.GenerateSecretKey(1337);
         connection.State = SessionStateEnum.WAITING_FOR_LOGIN;

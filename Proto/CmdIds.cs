@@ -4,19 +4,19 @@ public class CmdIds
 {
     public const int None = 0;
     
-    public const int GetPlayerTokenReq = 3956;
-    public const int GetPlayerTokenRsp = 22487;
+    public const int GetPlayerTokenReq = 28214;
+    public const int GetPlayerTokenRsp = 1574;
 
-    public const int PingReq = 5781;
-    public const int PingRsp = 20923;
+    public const int PingReq = 6603;
+    public const int PingRsp = 2794;
 
     // Step 1
-    public const int PlayerLoginReq = 24917;
-    public const int PlayerDataNotify = 20241;
+    public const int PlayerLoginReq = 24761;
+    public const int PlayerDataNotify = 1442;
     public const int AvatarDataNotify = 71;
     public const int OpenStateUpdateNotify = 7518;
     public const int PlayerEnterSceneNotify = 5390;
-    public const int PlayerLoginRsp = 5657;
+    public const int PlayerLoginRsp = 1548;
 
     // Step 2
     public const int EnterSceneReadyReq = 27445;

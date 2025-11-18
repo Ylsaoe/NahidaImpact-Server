@@ -66,6 +66,6 @@ public class EntityAvatar : SceneEntity
 
     public AbilityControlBlock BuildAbilityControlBlock()
     {
-        throw new NotImplementedException();
+        return new AbilityControlBlock();
     }
 }

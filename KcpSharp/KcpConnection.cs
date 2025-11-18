@@ -39,8 +39,6 @@ public class KcpConnection
     }
     
     public bool UseSecretKey { get; set; } = false;
-
-    public bool UseDispatchKey { get; set; } = false;
     
     public byte[]? SecretKey { get; set; } = Crypto.ENCRYPT_KEY;
     
@@ -128,7 +126,7 @@ public class KcpConnection
     {
         try
         {
-            Crypto.Xor(packet, UseDispatchKey? Crypto.DISPATCH_KEY : SecretKey);
+            Crypto.Xor(packet, UseSecretKey ? SecretKey : Crypto.DISPATCH_KEY);
             _ = await Conversation.SendAsync(packet, CancelToken.Token);
         }
         catch
