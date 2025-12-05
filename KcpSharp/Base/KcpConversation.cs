@@ -472,7 +472,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
                 }
 
                 KcpPacketHeader header = new(KcpCommand.Ack, 0, windowSize, timestamp, serialNumber, unacknowledged);
-                header.EncodeHeader(_id, 0, buffer.Span.Slice(size), out var bytesWritten);
+                header.EncodeHeader(_id, ReadOnlySpan<byte>.Empty, buffer.Span.Slice(size), out var bytesWritten);
                 size += bytesWritten;
             }
         }
@@ -573,7 +573,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
                     var data = segmentNode.ValueRef.Data;
                     if (!TransportClosed)
                     {
-                        header.EncodeHeader(_id, data.Length, buffer.Span.Slice(size), out var bytesWritten);
+                        header.EncodeHeader(_id, data.DataRegion.Span, buffer.Span.Slice(size), out var bytesWritten);
 
                         size += bytesWritten;
 
@@ -633,7 +633,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
             }
 
             KcpPacketHeader header = new(KcpCommand.WindowProbe, 0, windowSize, 0, 0, unacknowledged);
-            header.EncodeHeader(_id, 0, buffer.Span.Slice(size), out var bytesWritten);
+            header.EncodeHeader(_id, ReadOnlySpan<byte>.Empty, buffer.Span.Slice(size), out var bytesWritten);
             size += bytesWritten;
         }
 
@@ -652,7 +652,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
             }
 
             KcpPacketHeader header = new(KcpCommand.WindowSize, 0, windowSize, 0, 0, unacknowledged);
-            header.EncodeHeader(_id, 0, buffer.Span.Slice(size), out var bytesWritten);
+            header.EncodeHeader(_id, ReadOnlySpan<byte>.Empty, buffer.Span.Slice(size), out var bytesWritten);
             size += bytesWritten;
         }
 
@@ -720,7 +720,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
             if (TimeDiff(GetTimestamp(), _lastSendTick) > _keepAliveInterval)
             {
                 KcpPacketHeader header = new(KcpCommand.WindowSize, 0, windowSize, 0, 0, unacknowledged);
-                header.EncodeHeader(_id, 0, buffer.Span, out var bytesWritten);
+                header.EncodeHeader(_id, ReadOnlySpan<byte>.Empty, buffer.Span, out var bytesWritten);
                 await _transport.SendPacketAsync(buffer.Slice(0, bytesWritten), _remoteEndPoint, cancellationToken)
                     .ConfigureAwait(false);
                 _lastSendTick = GetTimestamp();
@@ -766,6 +766,11 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
     {
         return new KcpPacketHeader(header.Command, header.Fragment, windowSize, timestamp, header.SerialNumber,
             unacknowledged);
+    }
+
+    private static bool VerifyPayloadChecksum(ReadOnlySpan<byte> payload, uint expectedChecksum)
+    {
+        return KcpPacketHeader.CalculatePayloadChecksum(payload) == expectedChecksum;
     }
 
     private uint GetUnusedReceiveWindow()
@@ -879,7 +884,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
         }
 
         var length = BinaryPrimitives.ReadUInt32LittleEndian(packetSpan.Slice(16));
-        if (length > (uint)(packetSpan.Length - 20)) // implicitly checked for (int)length < 0
+        if (length > (uint)(packetSpan.Length - KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID)) // implicitly checked for (int)length < 0
             return default;
 
         var activation = _updateActivation;
@@ -891,7 +896,10 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
     private bool SetInput(ReadOnlySpan<byte> packet)
     {
         var current = GetTimestamp();
-        var packetHeaderSize = _id.HasValue ? 28 : 20;
+        var packetHeaderSize = _id.HasValue
+            ? KcpGlobalVars.HEADER_LENGTH_WITH_CONVID
+            : KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID;
+        var headerWithoutConversation = KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID;
 
         var prev_una = _snd_una;
         uint maxack = 0, latest_ts = 0;
@@ -910,9 +918,13 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
 
             var header = KcpPacketHeader.Parse(packet);
             var length = BinaryPrimitives.ReadInt32LittleEndian(packet.Slice(16));
+            var expectedChecksum = BinaryPrimitives.ReadUInt32LittleEndian(packet.Slice(20));
 
-            packet = packet.Slice(20);
+            packet = packet.Slice(headerWithoutConversation);
             if ((uint)length > (uint)packet.Length) return mutated;
+
+            var payload = packet.Slice(0, length);
+            if (!VerifyPayloadChecksum(payload, expectedChecksum)) return mutated;
 
             if (header.Command != KcpCommand.Push &&
                 header.Command != KcpCommand.Ack &&
@@ -960,7 +972,7 @@ public sealed partial class KcpConversation : IKcpConversation, IKcpExceptionPro
                 {
                     AckPush(header.SerialNumber, header.Timestamp);
                     if (TimeDiff(header.SerialNumber, _rcv_nxt) >= 0)
-                        mutated = HandleData(header, packet.Slice(0, length)) | mutated;
+                        mutated = HandleData(header, payload) | mutated;
 
                     if (_receiveWindowNotificationOptions is not null)
                         if (_ts_rcv_notify_wait != 0)

@@ -1,5 +1,6 @@
 ﻿using System.Buffers.Binary;
 using System.Diagnostics;
+using System.IO.Hashing;
 
 namespace NahidaImpact.KcpSharp.Base;
 
@@ -63,27 +64,34 @@ internal readonly struct KcpPacketHeader : IEquatable<KcpPacketHeader>
         );
     }
 
-    internal void EncodeHeader(ulong? conversationId, int payloadLength, Span<byte> destination, out int bytesWritten)
+    internal void EncodeHeader(ulong? conversationId, ReadOnlySpan<byte> payload, Span<byte> destination,
+        out int bytesWritten)
     {
-        Debug.Assert(destination.Length >= 20);
+        Debug.Assert(destination.Length >= KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID);
         if (conversationId.HasValue)
         {
             BinaryPrimitives.WriteUInt64BigEndian(destination, conversationId.GetValueOrDefault());
             destination = destination.Slice(8);
-            bytesWritten = 28;
+            bytesWritten = KcpGlobalVars.HEADER_LENGTH_WITH_CONVID;
         }
         else
         {
-            bytesWritten = 20;
+            bytesWritten = KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID;
         }
 
-        Debug.Assert(destination.Length >= 20);
+        Debug.Assert(destination.Length >= KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID);
         destination[1] = Fragment;
         destination[0] = (byte)Command;
         BinaryPrimitives.WriteUInt16LittleEndian(destination.Slice(2), WindowSize);
         BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(4), Timestamp);
         BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(8), SerialNumber);
         BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(12), Unacknowledged);
-        BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(16), (uint)payloadLength);
+        BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(16), (uint)payload.Length);
+        BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(20), CalculatePayloadChecksum(payload));
+    }
+
+    internal static uint CalculatePayloadChecksum(ReadOnlySpan<byte> payload)
+    {
+        return unchecked((uint)XxHash3.HashToUInt64(payload));
     }
 }
