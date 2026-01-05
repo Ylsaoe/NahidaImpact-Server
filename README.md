@@ -2,7 +2,7 @@
 
 ## 🙌 归属权
 
-- DanhengServer & FireflyDH - Some data structures and algorithms
+- DanhengServer & FireflyDH & Weedwacker-3.3 - Some data structures and algorithms
 
 - StopWuyu
 

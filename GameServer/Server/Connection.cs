@@ -7,6 +7,7 @@ using NahidaImpact.Util.Extensions;
 using NahidaImpact.Util.Security;
 using System.Buffers;
 using System.Net;
+using NahidaImpact.Database.Account;
 using NahidaImpact.Proto;
 
 namespace NahidaImpact.GameServer.Server;
@@ -17,18 +18,21 @@ public class Connection(KcpConversation conversation, IPEndPoint remote) : KcpCo
 
     public PlayerInstance? Player { get; set; }
 
+    public AccountData Account { get; set; }
+
     private static readonly HashSet<string> DummyPacketNames =
     [
 
     ];
 
-    public override void Start()
+    public override async void Start()
     {
-        base.Start();
-        _ = ReceiveLoop();
+        Logger.Info($"New connection from {RemoteEndPoint}.");
+        State = SessionStateEnum.WAITING_FOR_TOKEN;
+        await ReceiveLoop();
     }
 
-    public override void Stop(bool isServerStop = false)
+    public override async void Stop(bool isServerStop = false)
     {
         //if (isServerStop) await Player!.SendPacket(new PacketPlayerKickOutScNotify(KickType.KickLoginWhiteTimeout));
         Player?.OnLogoutAsync();
@@ -202,5 +206,21 @@ public class Connection(KcpConversation conversation, IPEndPoint remote) : KcpCo
 
         // Send Rsp
         await SendPacket(respOpcode);
+    }
+    
+    public async Task SetSecretKey(ulong seed)
+    {
+        var mt = new MT19937(seed);
+        mt.Seed(mt.Int63());
+        mt.Int63();
+
+        await using var ms = new MemoryStream(0x1000);
+        using var bw = new BinaryWriter(ms);
+        for (int i = 0; i < 0x1000; i += 8)
+        {
+            bw.WriteUInt64BE(mt.Int63());
+        }
+
+        SecretKey = ms.ToArray();
     }
 }

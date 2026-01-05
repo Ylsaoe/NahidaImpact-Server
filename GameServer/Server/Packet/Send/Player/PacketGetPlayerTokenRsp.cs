@@ -1,4 +1,5 @@
 using Google.Protobuf;
+using NahidaImpact.Database.Account;
 using NahidaImpact.KcpSharp;
 using NahidaImpact.Proto;
 using NahidaImpact.Util;
@@ -8,23 +9,22 @@ namespace NahidaImpact.GameServer.Server.Packet.Send.Player;
 
 public class PacketGetPlayerTokenRsp : BasePacket
 {
-    public PacketGetPlayerTokenRsp(Connection connection, string token) :base(CmdIds.GetPlayerTokenRsp)
+    public PacketGetPlayerTokenRsp(Connection connection) :base(CmdIds.GetPlayerTokenRsp)
     {
         var proto = new GetPlayerTokenRsp
         {
             Uid = (uint)connection.Player.Uid,
-            Token = token,
+            Token = connection.Account.ComboToken,
             SecurityCmdBuffer = ByteString.CopyFrom(Crypto.ENCRYPT_SEED_BUFFER),
             PlatformType = 3,
             ChannelId = 1,
             CountryCode = "US",
-            // ClientVersionRandomKey = "c25-314dd05b0b5f",
         };
 
         SetData(proto);
     }
     
-    public PacketGetPlayerTokenRsp(Connection connection,string token, uint keyId) : base(CmdIds.GetPlayerTokenRsp)
+    public PacketGetPlayerTokenRsp(Connection connection, uint keyId) : base(CmdIds.GetPlayerTokenRsp)
     {
         var serverRandKey = "";
         var sign = "";
@@ -41,9 +41,9 @@ public class PacketGetPlayerTokenRsp : BasePacket
         }
         
         var proto = new GetPlayerTokenRsp
-        {
+        { 
             Uid = (uint)connection.Player.Uid,
-            Token = token,
+            Token = connection.Account.ComboToken,
             SecurityCmdBuffer = ByteString.CopyFrom(Crypto.ENCRYPT_SEED_BUFFER),
             KeyId = keyId,
             ServerRandKey = serverRandKey,
@@ -51,24 +51,21 @@ public class PacketGetPlayerTokenRsp : BasePacket
             PlatformType = 3,
             ChannelId = 1,
             CountryCode = "US",
-            // ClientVersionRandomKey = "c25-314dd05b0b5f",
         };
 
         SetData(proto);
     }
     
-    public PacketGetPlayerTokenRsp(Connection connection, ulong secretKeySeed, string encryptedSeed, string encryptedSeedSign, string token) : base(CmdIds.GetPlayerTokenRsp)
+    public PacketGetPlayerTokenRsp(Connection connection, string encryptedSeed, string encryptedSeedSign) : base(CmdIds.GetPlayerTokenRsp)
     {
         GetPlayerTokenRsp proto = new GetPlayerTokenRsp()
         {
             Uid = (uint)connection.Player.Uid,
-            Token = token,
-            SecretKeySeed = secretKeySeed,
+            Token = connection.Account.ComboToken,
             SecurityCmdBuffer = ByteString.CopyFrom(Crypto.ENCRYPT_SEED_BUFFER),
             PlatformType = 3,
             ChannelId = 1,
             CountryCode = "US",
-            // ClientVersionRandomKey = "c25-314dd05b0b5f",
             ServerRandKey = encryptedSeed,
             Sign = encryptedSeedSign
         };

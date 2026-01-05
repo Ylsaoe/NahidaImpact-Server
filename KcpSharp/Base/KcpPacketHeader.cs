@@ -64,8 +64,7 @@ internal readonly struct KcpPacketHeader : IEquatable<KcpPacketHeader>
         );
     }
 
-    internal void EncodeHeader(ulong? conversationId, ReadOnlySpan<byte> payload, Span<byte> destination,
-        out int bytesWritten)
+    internal void EncodeHeader(ulong? conversationId, int payloadLength, Span<byte> destination, out int bytesWritten)
     {
         Debug.Assert(destination.Length >= KcpGlobalVars.HEADER_LENGTH_WITHOUT_CONVID);
         if (conversationId.HasValue)
@@ -86,12 +85,6 @@ internal readonly struct KcpPacketHeader : IEquatable<KcpPacketHeader>
         BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(4), Timestamp);
         BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(8), SerialNumber);
         BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(12), Unacknowledged);
-        BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(16), (uint)payload.Length);
-        BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(20), CalculatePayloadChecksum(payload));
-    }
-
-    internal static uint CalculatePayloadChecksum(ReadOnlySpan<byte> payload)
-    {
-        return unchecked((uint)XxHash3.HashToUInt64(payload));
+        BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(16), (uint)payloadLength);
     }
 }

@@ -15,9 +15,9 @@ public class Crypto
     public static byte[] ENCRYPT_KEY { get; private set; } = Array.Empty<byte>();
     public static byte[] ENCRYPT_SEED_BUFFER { get; private set; } = Array.Empty<byte>();
     
-    public static ulong ENCRYPT_SEED = ulong.Parse("11468049314633205968");
+    public static RSA? CUR_SIGNING_KEY { get; private set; }
+    public static RSA? SDK_PATCH_KEY { get; private set; }
     
-    public static RSA? SigningKey { get; private set; }
     public static Dictionary<int, RSA> EncryptionKeys { get; } = new();
     
     public static void LoadKeys()
@@ -34,8 +34,14 @@ public class Crypto
             
             // Load signature private key
             var signingKeyBytes = File.ReadAllBytes("Config/security/SigningKey.der");
-            SigningKey = RSA.Create();
-            SigningKey.ImportPkcs8PrivateKey(signingKeyBytes, out _);
+            CUR_SIGNING_KEY = RSA.Create();
+            CUR_SIGNING_KEY.ImportPkcs8PrivateKey(signingKeyBytes, out _);
+            
+            // Load sdk private key
+            var sdkBytes = File.ReadAllBytes("Config/security/sdk_private_key.der");
+            SDK_PATCH_KEY = RSA.Create();
+            SDK_PATCH_KEY.ImportPkcs8PrivateKey(sdkBytes, out _);
+            
             
             // Load the game public key
             var gameKeysDir = "Config/security/game_keys";
@@ -86,7 +92,7 @@ public class Crypto
     // Simple way to create a unique session key
     public static string CreateSessionKey(string accountUid)
     {
-        var random = new byte[64];
+        var random = new byte[32];
         SecureRandom.NextBytes(random);
 
         var temp = accountUid + "." + DateTime.Now.Ticks + "." + SecureRandom;
@@ -111,7 +117,7 @@ public class Crypto
             throw new ArgumentException("Invalid Key ID format", nameof(keyId));
         if (!EncryptionKeys.TryGetValue(id, out var publicKey))
             throw new KeyNotFoundException($"No encryption key found for ID: {keyId}");
-        if (SigningKey == null)
+        if (CUR_SIGNING_KEY == null)
             throw new InvalidOperationException("Signing key has not been initialized");
         
         // 分块加密
@@ -133,7 +139,7 @@ public class Crypto
         }
         
         // 创建签名
-        byte[] signature = SigningKey.SignData(
+        byte[] signature = CUR_SIGNING_KEY.SignData(
             regionInfo, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         
         return new QueryCurRegionRspJson
@@ -146,47 +152,5 @@ public class Crypto
     public static RSA GetDispatchEncryptionKey(int key)
     {
         return EncryptionKeys[key];
-    }
-
-    public static ulong GenerateEncryptKeyAndSeed(byte[] encryptKey)
-    {
-        using var rng = RandomNumberGenerator.Create();
-        byte[] seedBytes = new byte[8];
-        rng.GetBytes(seedBytes);
-        var encryptSeed = BitConverter.ToUInt64(seedBytes, 0);
-        var mt = new MT19937(encryptSeed);
-        var newSeed = mt.Int63();
-        mt = new MT19937(newSeed);
-        mt.Int63(); 
-        for (int i = 0; i < 4096 >> 3; i++)
-        {
-            var rand = mt.Int63();
-            encryptKey[i << 3] = (byte)(rand >> 56);
-            encryptKey[(i << 3) + 1] = (byte)(rand >> 48);
-            encryptKey[(i << 3) + 2] = (byte)(rand >> 40);
-            encryptKey[(i << 3) + 3] = (byte)(rand >> 32);
-            encryptKey[(i << 3) + 4] = (byte)(rand >> 24);
-            encryptKey[(i << 3) + 5] = (byte)(rand >> 16);
-            encryptKey[(i << 3) + 6] = (byte)(rand >> 8);
-            encryptKey[(i << 3) + 7] = (byte)rand;
-        }
-    
-        return encryptSeed;
-    }
-    
-    public static byte[] GenerateSecretKey(ulong seed)
-    {
-        byte[] key = GC.AllocateUninitializedArray<byte>(0x1000);
-        Span<byte> keySpan = key.AsSpan();
-
-        MT19937 mt = new(seed);
-        mt.Int63();
-
-        for (int i = 0; i < 0x1000; i += 8)
-        {
-            BinaryPrimitives.WriteUInt64BigEndian(keySpan[i..], mt.Int63());
-        }
-
-        return key;
     }
 }

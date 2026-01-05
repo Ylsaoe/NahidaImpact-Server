@@ -6,6 +6,7 @@ using Google.Protobuf.Reflection;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Reflection;
+using NahidaImpact.Util.Extensions;
 
 namespace NahidaImpact.KcpSharp;
 
@@ -33,16 +34,12 @@ public class KcpConnection
         Conversation = conversation;
         RemoteEndPoint = remote;
         CancelToken = new CancellationTokenSource();
-        this.SecretKey = new byte[4096];
-        EncryptSeed = Crypto.GenerateEncryptKeyAndSeed(SecretKey);
         Start();
     }
+
+    public bool UseSecretKey { get; set; }
     
-    public bool UseSecretKey { get; set; } = false;
-    
-    public byte[]? SecretKey { get; set; } = Crypto.ENCRYPT_KEY;
-    
-    public ulong EncryptSeed { get; private set; } = Crypto.ENCRYPT_SEED;
+    public byte[]? SecretKey { get; set; } = Crypto.DISPATCH_SEED;
 
     public long? ConversationId => Conversation.ConversationId;
 
